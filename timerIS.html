@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Imagine Summit — Compte à rebours</title>
+<style>
+  :root{
+    /* Remplace 'visuel-imagine.jpg' par ton fichier (même dossier) */
+    --event-img: url('visuel-imagine.jpg');
+    --bg: #000;
+    --accent: #ffcc00;
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    color:#fff;
+    overflow:hidden;
+  }
+
+  /* Conteneur centré */
+  .center {
+    position:relative;
+    z-index:5; /* au-dessus des bulles */
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:20px;
+    box-sizing:border-box;
+  }
+
+  h1 {
+    font-size: clamp(1.6rem, 3.5vw, 2.8rem);
+    margin:0 0 12px;
+    letter-spacing:1px;
+    color:var(--accent);
+  }
+
+  .subtitle {
+    margin:0 0 30px;
+    font-size:clamp(0.9rem,2vw,1.1rem);
+    opacity:0.9;
+  }
+
+  /* Compte à rebours */
+  #countdown {
+    display:flex;
+    gap:18px;
+    align-items:baseline;
+    justify-content:center;
+    margin-bottom:18px;
+    user-select:none;
+  }
+
+  .time-block {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-width:90px;
+  }
+
+  .num {
+    font-weight:700;
+    font-size: clamp(2.4rem, 9vw, 8rem); /* très grand et réactif */
+    line-height:0.9;
+    letter-spacing: -3px;
+  }
+
+  .label {
+    font-size:clamp(0.7rem, 1.6vw, 1rem);
+    margin-top:6px;
+    opacity:0.8;
+    text-transform:uppercase;
+    letter-spacing:1px;
+  }
+
+  /* Petit texte sous le compte à rebours */
+  .note {
+    font-size:0.95rem;
+    opacity:0.8;
+    margin-top:10px;
+  }
+
+  /* Conteneur des bulles (fond animé) */
+  .snow-container {
+    position:fixed;
+    inset:0;
+    z-index:1; /* en dessous du contenu principal */
+    pointer-events:none; /* laisse les clics passer */
+    overflow:hidden;
+    background: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.85) 100%);
+  }
+
+  /* Mask optionnel - rend le fond très sombre */
+  .bg-visual {
+    position:absolute;
+    inset:0;
+    z-index:0;
+    background-image: var(--event-img);
+    background-size:cover;
+    background-position:center;
+    filter: blur(6px) brightness(0.25);
+    transform: scale(1.05);
+  }
+
+  /* Bulles (éléments qui tombent) */
+  .snowball {
+    position:absolute;
+    top:-20vh;
+    border-radius:50%;
+    background-image: var(--event-img);
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+    opacity: 0.95;
+    will-change: transform, opacity;
+    z-index:2;
+    animation-name: fall, sway, spin;
+    animation-timing-function: linear;
+    animation-iteration-count: 1;
+  }
+
+  /* Animations :
+     - fall : translation Y
+     - sway : translation X (légers mouvements)
+     - spin : rotation légère
+  */
+  @keyframes fall {
+    0% { transform: translateY(-30vh) translateX(0) scale(1); opacity:0.95; }
+    10% { opacity:1; }
+    100% { transform: translateY(120vh) translateX(var(--drift, 0px)) scale(var(--scale,1)); opacity:0.95; }
+  }
+
+  @keyframes sway {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(var(--sway, 30px)); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes spin {
+    from { rotate:0deg; }
+    to   { rotate:var(--rot, 360deg); }
+  }
+
+  /* responsive adjustments: réduit les gaps dans petits écrans */
+  @media (max-width:600px){
+    #countdown { gap:10px; }
+    .time-block { min-width:64px; }
+    .num { letter-spacing: -1px; }
+  }
+</style>
+</head>
+<body>
+  <div class="snow-container" id="snowContainer">
+    <div class="bg-visual" id="bgVisual"></div>
+    <!-- Les bulles seront injectées par JS ici -->
+  </div>
+
+  <div class="center" role="main" aria-labelledby="title">
+    <h1 id="title">Imagine Summit</h1>
+    <p class="subtitle">Compte à rebours jusqu'au lancement</p>
+
+    <div id="countdown" aria-live="polite">
+      <div class="time-block">
+        <div class="num" id="days">00</div>
+        <div class="label">Jours</div>
+      </div>
+      <div class="time-block">
+        <div class="num" id="hours">00</div>
+        <div class="label">Heures</div>
+      </div>
+      <div class="time-block">
+        <div class="num" id="minutes">00</div>
+        <div class="label">Minutes</div>
+      </div>
+      <div class="time-block">
+        <div class="num" id="seconds">00</div>
+        <div class="label">Secondes</div>
+      </div>
+    </div>
+
+    <div class="note" id="whenNote">Début : jeudi 4 décembre 2025 — 09:00 (Europe/Paris)</div>
+  </div>
+
+<script>
+/* --------------------------
+   Paramètres
+   -------------------------- */
+const TARGET_ISO = "2025-12-04T09:00:00+01:00"; // 9h00, 4 déc 2025, Europe/Paris (UTC+1)
+const NUM_BALLS = 30;        // nombre de bulles / boules de neige
+const MIN_SIZE = 36;        // px
+const MAX_SIZE = 160;       // px
+const MIN_DURATION = 9;     // sec (chute)
+const MAX_DURATION = 20;    // sec
+const CONTAINER = document.getElementById('snowContainer');
+
+/* --------------------------
+   Compte à rebours
+   -------------------------- */
+const targetDate = new Date(TARGET_ISO);
+
+// Utilitaire format
+function pad(n){ return String(n).padStart(2,'0'); }
+
+function updateCountdown(){
+  const now = new Date();
+  let diff = Math.floor((targetDate - now) / 1000); // en secondes
+
+  if (diff <= 0) {
+    // Evénement démarré
+    document.getElementById('days').textContent = "00";
+    document.getElementById('hours').textContent = "00";
+    document.getElementById('minutes').textContent = "00";
+    document.getElementById('seconds').textContent = "00";
+    document.querySelector('.subtitle').textContent = "C'est parti ! ✨";
+    // on peut arrêter l'intervalle
+    clearInterval(countdownInterval);
+    return;
+  }
+
+  const days = Math.floor(diff / 86400);
+  diff %= 86400;
+  const hours = Math.floor(diff / 3600);
+  diff %= 3600;
+  const minutes = Math.floor(diff / 60);
+  const seconds = diff % 60;
+
+  document.getElementById('days').textContent = pad(days);
+  document.getElementById('hours').textContent = pad(hours);
+  document.getElementById('minutes').textContent = pad(minutes);
+  document.getElementById('seconds').textContent = pad(seconds);
+}
+
+// Lancement de l'intervalle (mise-à-jour chaque seconde)
+updateCountdown();
+const countdownInterval = setInterval(updateCountdown, 1000);
+
+/* --------------------------
+   Création des bulles (JS)
+   -------------------------- */
+function rand(min, max){ return Math.random() * (max - min) + min; }
+
+function createBall(i){
+  const el = document.createElement('div');
+  el.className = 'snowball';
+  // taille et échelle
+  const size = Math.round(rand(MIN_SIZE, MAX_SIZE));
+  el.style.width = size + 'px';
+  el.style.height = size + 'px';
+  el.style.borderRadius = '50%';
+
+  // position horizontale initiale (pourcentage)
+  const leftPct = rand(-10, 110);
+  el.style.left = leftPct + '%';
+
+  // durée de la chute
+  const duration = rand(MIN_DURATION, MAX_DURATION);
+  el.style.animationDuration = `${duration}s, ${rand(3,7)}s, ${rand(6,18)}s`; // fall, sway, spin
+
+  // léger décalage (delay) pour disperser les bulles
+  el.style.animationDelay = `${rand(0,8)}s, 0s, 0s`;
+
+  // drift horizontal final (px)
+  const drift = Math.round(rand(-120, 120));
+  el.style.setProperty('--drift', drift + 'px');
+
+  // sway magnitude
+  const sway = Math.round(rand(-40, 40));
+  el.style.setProperty('--sway', sway + 'px');
+
+  // rotation variable
+  const rot = Math.round(rand(-360, 360));
+  el.style.setProperty('--rot', rot + 'deg');
+
+  // échelle (pour variation)
+  const scale = (size / MAX_SIZE) * rand(0.85, 1.2);
+  el.style.setProperty('--scale', scale);
+
+  // opacité
+  el.style.opacity = rand(0.75, 1);
+
+  // z-index pseudo-random (pour profondeur)
+  const z = Math.round(rand(1,4));
+  el.style.zIndex = 2 + z;
+
+  // background position random pour varier le crop du visuel
+  const bgX = Math.round(rand(0,100));
+  const bgY = Math.round(rand(0,100));
+  el.style.backgroundPosition = `${bgX}% ${bgY}%`;
+
+  // on ajoute à la zone
+  CONTAINER.appendChild(el);
+
+  // removal : cleanup après l'animation (empêche accumulation)
+  // durée totale approximative (prendre un peu plus pour delay)
+  const totalMs = (duration + 10) * 1000;
+  setTimeout(()=> {
+    el.remove();
+    // pour garder un nombre constant de bulles, on recrée une nouvelle
+    // (donc l'effet est continu)
+    createBall();
+  }, totalMs);
+}
+
+// initial fill
+for(let i=0;i<NUM_BALLS;i++){
+  // échelonner la création pour éviter surchage immédiate
+  setTimeout(()=> createBall(i), i * 160);
+}
+
+/* --------------------------
+   Conseils / personnalisations
+   --------------------------
+- Pour remplacer le visuel : modifier la variable CSS --event-img au début:
+    :root { --event-img: url('ton-fichier.jpg'); }
+- Ajuster NUM_BALLS pour plus/moins d'éléments.
+- Les bulles sont des divs avec background = ton visuel; elles sont cropées de façon aléatoire.
+- Si tu veux un fond totalement noir (sans ton visuel flouté), supprime la div #bgVisual ou commente sa CSS.
+--------------------------- */
+</script>
+</body>
+</html>
